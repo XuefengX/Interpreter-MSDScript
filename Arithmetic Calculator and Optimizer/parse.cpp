@@ -30,7 +30,7 @@ char get_next(std::istream &in){
 }
 
 Expr *addend(std::istream &in);
-Expr *number_or_paren(std::istream &in);
+Expr *inner(std::istream &in);
 Expr *parse_number(std::istream &in);
 Expr *parse_variable(std::istream &in);
 Expr *let(std::istream &in);
@@ -61,7 +61,7 @@ Expr *expr(std::istream &in) {
  | <number-or-paren> * <addend>
  */
 Expr *addend(std::istream &in) {
-    Expr *num = number_or_paren(in);
+    Expr *num = inner(in);
     if(num == nullptr) return nullptr;
     char c = peek_next(in);
     if (c == '*') {
@@ -79,7 +79,7 @@ Expr *addend(std::istream &in) {
  | (<expr>)
  | <variable>
  */
-Expr *number_or_paren(std::istream &in){
+Expr *inner(std::istream &in){
     char c = peek_next(in);
     if (c == '(') { // if is a parenthesis
         get_next(in);
@@ -106,7 +106,7 @@ Expr *number_or_paren(std::istream &in){
 }
 
 Expr *let(std::istream &in){
-    VarExpr *ve = dynamic_cast<VarExpr*>(number_or_paren(in));
+    VarExpr *ve = dynamic_cast<VarExpr*>(inner(in));
     char c = peek_next(in);
     if(c != '=')
         throw std::runtime_error((std::string)"Should have = keyword");
@@ -116,8 +116,7 @@ Expr *let(std::istream &in){
     if(in_string != "_in")
         throw std::runtime_error((std::string)"Should have _in keyword");
     Expr *se = expr(in);
-    se = se->subst(ve->name, fe->value());
-    return new LetExpr(ve, fe, se);
+    return new LetExpr(ve->name, fe, se);
 }
 
 
@@ -190,3 +189,6 @@ TEST_CASE( "equals" ) {
     CHECK(parse_str("3*(2+width)")->equals(new MultExpr(new NumExpr(3),new AddExpr(new NumExpr(2), new VarExpr("width")))));
 }
 
+TEST_CASE("optimize"){
+    CHECK(parse_str("_let x = 5 _in _let y = z + 2 _in x + y + (2 * 3)")->optimize()->equals(parse_str("_let y = z + 2 _in 5 + y + 6")));
+}

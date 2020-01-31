@@ -6,6 +6,7 @@
 //  Copyright © 2020 Xuefeng Xu. All rights reserved.
 //
 
+#include <iostream>
 #include "expr.hpp"
 #include "catch.hpp"
 
@@ -21,7 +22,7 @@ bool NumExpr::equals(Expr *e) {
         return val == n->val;
 }
 
-Val *NumExpr::value(){
+Val *NumExpr::interp(){
     return new NumVal(val);
 }
 
@@ -29,8 +30,16 @@ Expr *NumExpr::subst(std::string var, Val* new_val){
     return this;
 }
 
+Expr *NumExpr::optimize(){
+    return this;
+}
+
+bool NumExpr::containsVar(){
+    return false;
+}
+
 std::string NumExpr::to_string(){
-    return this->value()->to_string();
+    return interp()->to_string();
 }
 
 AddExpr::AddExpr(Expr *lhs, Expr *rhs) {
@@ -47,16 +56,26 @@ bool AddExpr::equals(Expr *e) {
                 && rhs->equals(a->rhs));
 }
 
-Val *AddExpr::value(){
-    return lhs->value()->add_to(rhs->value());
+Val *AddExpr::interp(){
+    return lhs->interp()->add_to(rhs->interp());
 }
 
 Expr *AddExpr::subst(std::string var, Val* new_val){
     return new AddExpr(lhs->subst(var, new_val), rhs->subst(var, new_val));
 }
 
+Expr *AddExpr::optimize(){
+    lhs = lhs->optimize();
+    rhs = rhs->optimize();
+    return containsVar() ? this : interp()->to_expr();
+}
+
+bool AddExpr::containsVar(){
+    return lhs->containsVar() || rhs->containsVar();
+}
+
 std::string AddExpr::to_string(){
-    return lhs->value()->to_string() + " + " + rhs->value()->to_string();
+    return lhs->to_string() + " + " + rhs->to_string();
 }
 
 MultExpr::MultExpr(Expr *lhs, Expr *rhs) {
@@ -73,16 +92,26 @@ bool MultExpr::equals(Expr *e) {
                 && rhs->equals(m->rhs));
 }
 
-Val *MultExpr::value(){
-    return lhs->value()->mult_with(rhs->value());
+Val *MultExpr::interp(){
+    return lhs->interp()->mult_with(rhs->interp());
 }
 
 Expr *MultExpr::subst(std::string var, Val* new_val){
     return new MultExpr(lhs->subst(var, new_val), rhs->subst(var, new_val));
 }
 
+Expr *MultExpr::optimize(){
+    lhs = lhs->optimize();
+    rhs = rhs->optimize();
+    return containsVar() ? this : interp()->to_expr();
+}
+
+bool MultExpr::containsVar(){
+    return lhs->containsVar() || rhs->containsVar();
+}
+
 std::string MultExpr::to_string(){
-    return lhs->value()->to_string() + " * " + rhs->value()->to_string();
+    return lhs->to_string() + " * " + rhs->to_string();
 }
 
 VarExpr::VarExpr(std::string name){
@@ -97,8 +126,8 @@ bool VarExpr::equals(Expr *e){
         return name == n->name;
 }
 
-Val *VarExpr::value(){
-    return new NumVal(0);
+Val *VarExpr::interp(){
+    throw std::runtime_error((std::string)"cannot interpret a variable");
 }
 
 Expr *VarExpr::subst(std::string var, Val* new_val){
@@ -106,6 +135,14 @@ Expr *VarExpr::subst(std::string var, Val* new_val){
         return new_val->to_expr();
     else
         return this;
+}
+
+Expr *VarExpr::optimize(){
+    return this;
+}
+
+bool VarExpr::containsVar(){
+    return true;
 }
 
 std::string VarExpr::to_string(){
@@ -124,7 +161,7 @@ bool BoolExpr::equals(Expr *e){
         return val == be->val;
 }
 
-Val *BoolExpr::value(){
+Val *BoolExpr::interp(){
     return new BoolVal(val);
 }
 
@@ -132,37 +169,71 @@ Expr *BoolExpr::subst(std::string var, Val* new_val){
     return this;
 }
 
-std::string BoolExpr::to_string(){
-    return val ? "true" : "false";
+Expr *BoolExpr::optimize(){
+    return this;
 }
 
-LetExpr::LetExpr(Expr *let_var, Expr *eq_expr, Expr *in_expr){
+bool BoolExpr::containsVar(){
+    return false;
+}
+
+std::string BoolExpr::to_string(){
+    return interp()->to_string();
+}
+
+LetExpr::LetExpr(std::string let_var, Expr *eq_expr, Expr *in_expr){
     this->let_var = let_var;
-    this->eq_expr = eq_expr;
-    this->in_expr = in_expr;
+    this->rhs = eq_expr;
+    this->body = in_expr;
 }
 
 bool LetExpr::equals(Expr *e){
     LetExpr *le = dynamic_cast<LetExpr*>(e);
     if(le == nullptr)
         return false;
-    return let_var->equals(le->let_var) && eq_expr->equals(le->eq_expr) && in_expr->equals(le->eq_expr);
+    return let_var == le->let_var && rhs->equals(le->rhs) && body->equals(le->rhs);
 }
 
-Val *LetExpr::value(){
-    return in_expr->value();
+Val *LetExpr::interp(){
+    Val *rhs_val = rhs->interp();
+    Expr *new_body = body->subst(let_var, rhs_val);
+    return new_body->interp();
 }
 
 Expr *LetExpr::subst(std::string var, Val* new_val){
-    VarExpr *ve = dynamic_cast<VarExpr*>(let_var);
-    return in_expr->subst(ve->name, eq_expr->value());
+    // substitute body only when the variables are not the same
+    if(let_var != var){
+        body = body->subst(var, new_val);
+    }
+    // always substitute the rhs
+    rhs = rhs->subst(var, new_val);
+    return this;
+}
+
+Expr *LetExpr::optimize(){
+    if(rhs->containsVar()){
+        rhs = rhs->optimize();
+        body = body->optimize();
+        std::cout << "old body: " << body->to_string() << std::endl;
+        std::cout << "old let: " << to_string() << std::endl;
+        return this;
+    }
+    // If the expression after equal sign contains no variable
+    // We can eliminate the let expression
+    Val *rhs_val = rhs->interp();
+    Expr *new_body = body->subst(let_var, rhs_val);
+    std::cout << "new body: " << new_body->to_string() << std::endl;
+    return new_body->optimize();
+}
+
+bool LetExpr::containsVar(){
+    LetExpr *le = dynamic_cast<LetExpr *>(optimize());
+    return le->body->containsVar();
 }
 
 std::string LetExpr::to_string(){
-    VarExpr *ve = dynamic_cast<VarExpr*>(let_var);
-    return "_let " + ve->name + " = " + eq_expr->to_string() + " _in " + in_expr->to_string();
+    return "_let " + let_var + " = " + rhs->to_string() + " _in " + body->to_string();
 }
-
 
 TEST_CASE( "equals" ) {
     CHECK( (new NumExpr(1))->equals(new NumExpr(1)) );
@@ -183,11 +254,11 @@ TEST_CASE( "equals" ) {
 }
 
 TEST_CASE( "value") {
-    CHECK( (new NumExpr(10))->value()->equals(new NumVal(10)) );
-    CHECK( (new VarExpr("fish"))->value()->equals(new NumVal(0)) );
-    CHECK( (new AddExpr(new NumExpr(3), new NumExpr(2)))->value()
+    CHECK( (new NumExpr(10))->interp()->equals(new NumVal(10)) );
+    CHECK( (new VarExpr("fish"))->interp()->equals(new NumVal(0)) );
+    CHECK( (new AddExpr(new NumExpr(3), new NumExpr(2)))->interp()
           ->equals(new NumVal(5)) );
-    CHECK( (new MultExpr(new NumExpr(3), new NumExpr(2)))->value()
+    CHECK( (new MultExpr(new NumExpr(3), new NumExpr(2)))->interp()
           ->equals(new NumVal(6)) );
 }
 

@@ -16,10 +16,14 @@ class Expr {
 public:
     virtual bool equals(Expr *e) = 0;
     // Compute the value of an expression
-    virtual Val *value() = 0;
+    virtual Val *interp() = 0;
     // Substitute a number in place of a variable
     virtual Expr *subst(std::string var, Val* new_val) = 0;
-    // To String
+    // Optimize the code to make it easy to deal with
+    virtual Expr *optimize() = 0;
+    // Return if the current expresssion contians variable
+    virtual bool containsVar() = 0;
+    // Get expression as a string format
     virtual std::string to_string() = 0;
 };
 
@@ -29,8 +33,10 @@ public:
     
     NumExpr(int val);
     bool equals(Expr *e);
-    Val *value();
+    Val *interp();
     Expr *subst(std::string var, Val* new_val);
+    Expr *optimize();
+    bool containsVar();
     std::string to_string();
 };
 
@@ -41,8 +47,10 @@ public:
     
     AddExpr(Expr *lhs, Expr *rhs);
     bool equals(Expr *e);
-    Val *value();
+    Val *interp();
     Expr *subst(std::string var, Val* new_val);
+    Expr *optimize();
+    bool containsVar();
     std::string to_string();
 };
 
@@ -53,8 +61,10 @@ public:
     
     MultExpr(Expr *lhs, Expr *rhs);
     bool equals(Expr *e);
-    Val *value();
+    Val *interp();
     Expr *subst(std::string var, Val* new_val);
+    Expr *optimize();
+    bool containsVar();
     std::string to_string();
 };
 
@@ -64,8 +74,10 @@ public:
     
     VarExpr(std::string name);
     bool equals(Expr *e);
-    Val *value();
+    Val *interp();
     Expr *subst(std::string var, Val* new_val);
+    Expr *optimize();
+    bool containsVar();
     std::string to_string();
 };
 
@@ -75,21 +87,25 @@ public:
     
     BoolExpr(bool val);
     bool equals(Expr *e);
-    Val *value();
+    Val *interp();
     Expr *subst(std::string var, Val* new_val);
+    Expr *optimize();
+    bool containsVar();
     std::string to_string();
 };
 
 class LetExpr : public Expr{
 public:
-    Expr *let_var;
-    Expr *eq_expr;
-    Expr *in_expr;
+    std::string let_var;
+    Expr *rhs;
+    Expr *body;
     
-    LetExpr(Expr *let_var, Expr *eq_expr, Expr *in_expr);
+    LetExpr(std::string let_var, Expr *eq_expr, Expr *in_expr);
     bool equals(Expr *e);
-    Val *value();
+    Val *interp();
     Expr *subst(std::string var, Val* new_val);
+    Expr *optimize();
+    bool containsVar();
     std::string to_string();
 };
 

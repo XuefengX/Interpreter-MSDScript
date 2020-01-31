@@ -71,9 +71,6 @@ Working log:
         ```
 
 * Jan 30, 2020
-    1. Add support for booleans and comparisons to your interpreter and
-   optimizer. That includes `_true`, `_false`, `_if`, `==`, and
-   converting interpreter to work with number and boolean values
-   instead of just number values. Also support negative numbers, and
-   make attempting to get the value of a variable (one that hasn't
-   been replaced) report an error instead of 0.
+    1. Add support for booleans and comparisons to interpreter andoptimizer. That includes `_true`, `_false`, `_if`, `==`, and converting interpreter to work with number and boolean values instead of just number values. Also support negative numbers, and make attempting to get the value of a variable (one that hasn't been replaced) report an error instead of 0.
+    2. Change value method to interpreter, simplify method to optimizer. Make optimizer logic more robust.
+    3. Try to add random tests

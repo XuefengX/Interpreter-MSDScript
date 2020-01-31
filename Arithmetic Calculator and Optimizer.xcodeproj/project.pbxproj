@@ -13,7 +13,6 @@
 		DCD4143F23D795E8006E807F /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCD4143E23D795E8006E807F /* main.cpp */; };
 		DCD4144723D7CC38006E807F /* test.m in Sources */ = {isa = PBXBuildFile; fileRef = DCD4144623D7CC38006E807F /* test.m */; };
 		DCD4144E23D7CDF7006E807F /* run.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCD4144D23D7CDF7006E807F /* run.cpp */; };
-		DCD4145123D8FBBD006E807F /* optimizer.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DCD4144F23D8FBBD006E807F /* optimizer.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -43,8 +42,6 @@
 		DCD4144823D7CC38006E807F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		DCD4144C23D7CDD0006E807F /* run.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = run.h; sourceTree = "<group>"; };
 		DCD4144D23D7CDF7006E807F /* run.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = run.cpp; sourceTree = "<group>"; };
-		DCD4144F23D8FBBD006E807F /* optimizer.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = optimizer.cpp; sourceTree = "<group>"; };
-		DCD4145023D8FBBD006E807F /* optimizer.hpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.h; path = optimizer.hpp; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -88,8 +85,6 @@
 			children = (
 				DCD4143623D6A139006E807F /* expr.hpp */,
 				DCD4143823D79560006E807F /* expr.cpp */,
-				DCD4144F23D8FBBD006E807F /* optimizer.cpp */,
-				DCD4145023D8FBBD006E807F /* optimizer.hpp */,
 				DCD4143A23D79596006E807F /* value.cpp */,
 				DCD4143B23D79596006E807F /* value.hpp */,
 				DCD4143D23D795AD006E807F /* parse.hpp */,
@@ -199,7 +194,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				DCD4145123D8FBBD006E807F /* optimizer.cpp in Sources */,
 				DCD4143923D79560006E807F /* expr.cpp in Sources */,
 				DCD4143C23D79596006E807F /* value.cpp in Sources */,
 				DCD4143F23D795E8006E807F /* main.cpp in Sources */,
