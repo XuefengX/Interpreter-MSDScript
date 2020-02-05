@@ -42,6 +42,38 @@ std::string NumExpr::to_string(){
     return interp()->to_string();
 }
 
+EquExpr::EquExpr(Expr *lhs, Expr *rhs){
+    this->lhs = lhs;
+    this->rhs = rhs;
+}
+
+bool EquExpr::equals(Expr *e){
+    EquExpr *ee = dynamic_cast<EquExpr *>(e);
+    return lhs->equals(ee->lhs) && rhs->equals(ee->rhs);
+}
+
+Val *EquExpr::interp(){
+    return lhs->equals(rhs) ? new BoolVal(true) : new BoolVal(false);
+}
+
+Expr *EquExpr::subst(std::string var, Val* new_val){
+    return new EquExpr(lhs->subst(var, new_val), rhs->subst(var, new_val));
+}
+
+Expr *EquExpr::optimize(){
+    Expr *lhs_opti = lhs->optimize();
+    Expr *rhs_opti = rhs->optimize();
+    return lhs_opti->containsVar() || rhs_opti->containsVar() ? new EquExpr(lhs_opti, rhs_opti) : interp()->to_expr();
+}
+
+bool EquExpr::containsVar(){
+    return lhs->containsVar() || rhs->containsVar();
+}
+
+std::string EquExpr::to_string(){
+    return lhs->to_string() + " == " + rhs->to_string();
+}
+
 AddExpr::AddExpr(Expr *lhs, Expr *rhs) {
     this->lhs = lhs;
     this->rhs = rhs;
@@ -191,28 +223,26 @@ bool LetExpr::equals(Expr *e){
     LetExpr *le = dynamic_cast<LetExpr*>(e);
     if(le == nullptr)
         return false;
-    return let_var == le->let_var && rhs->equals(le->rhs) && body->equals(le->rhs);
+    return let_var == le->let_var && rhs->equals(le->rhs) && body->equals(le->body);
 }
 
 Val *LetExpr::interp(){
-    return optimize()->interp();
+    Val *rhs_val = rhs->interp();
+    Expr *new_body = body->subst(let_var, rhs_val);
+    return new_body->interp();
 }
 
 Expr *LetExpr::subst(std::string var, Val* new_val){
     // substitute body only when the variables are not the same
-    if(let_var != var){
-        body = body->subst(var, new_val);
-    }
+    if(let_var == var)
+        return new LetExpr(let_var, rhs, body);
     // always substitute the rhs
-    rhs = rhs->subst(var, new_val);
-    return this;
+    return new LetExpr(let_var, rhs->subst(var, new_val), body->subst(var, new_val));
 }
 
 Expr *LetExpr::optimize(){
     if(rhs->containsVar()){
-        rhs = rhs->optimize();
-        body = body->optimize();
-        return this;
+        return new LetExpr(let_var, rhs->optimize(), body->optimize());
     }
     // If the expression after equal sign contains no variable
     // We can eliminate the let expression
@@ -222,12 +252,54 @@ Expr *LetExpr::optimize(){
 }
 
 bool LetExpr::containsVar(){
-    LetExpr *le = dynamic_cast<LetExpr *>(optimize());
-    return le->body->containsVar();
+    return rhs->containsVar() || body->subst(let_var, rhs->interp())->containsVar();
 }
 
 std::string LetExpr::to_string(){
     return "_let " + let_var + " = " + rhs->to_string() + " _in " + body->to_string();
+}
+
+
+IfExpr::IfExpr(Expr *test_part, Expr *then_part, Expr *else_part){
+    this->test_part = test_part;
+    this->then_part = then_part;
+    this->else_part = else_part;
+}
+
+bool IfExpr::equals(Expr *e){
+    IfExpr *ie = dynamic_cast<IfExpr *>(e);
+    return test_part->equals(ie->test_part) && then_part->equals(ie->then_part) && else_part->equals(ie->else_part);
+}
+
+Val *IfExpr::interp(){
+    if(test_part->interp()->is_ture()){
+        return then_part->interp();
+    }else{
+        return else_part->interp();
+    }
+}
+    
+Expr *IfExpr::subst(std::string var, Val* new_val){
+    return new IfExpr(test_part->subst(var, new_val), then_part->subst(var, new_val), else_part->subst(var, new_val));
+}
+
+Expr *IfExpr::optimize(){
+    if(test_part->containsVar())
+        return this;
+    else{
+        if(test_part->interp()->is_ture())
+            return then_part->optimize();
+        else
+            return else_part->optimize();
+    }
+}
+
+bool IfExpr::containsVar(){
+    return test_part->containsVar() ? true : test_part->interp()->is_ture() ? then_part->containsVar() : else_part->containsVar();
+}
+
+std::string IfExpr::to_string(){
+    return "_if " + test_part->to_string() + " _then " + then_part->to_string() + " _else " + else_part->to_string();
 }
 
 TEST_CASE( "equals" ) {
@@ -250,7 +322,7 @@ TEST_CASE( "equals" ) {
 
 TEST_CASE( "value") {
     CHECK( (new NumExpr(10))->interp()->equals(new NumVal(10)) );
-    CHECK( (new VarExpr("fish"))->interp()->equals(new NumVal(0)) );
+    CHECK_THROWS_WITH((new VarExpr("fish"))->interp(), "cannot interpret a variable");
     CHECK( (new AddExpr(new NumExpr(3), new NumExpr(2)))->interp()
           ->equals(new NumVal(5)) );
     CHECK( (new MultExpr(new NumExpr(3), new NumExpr(2)))->interp()

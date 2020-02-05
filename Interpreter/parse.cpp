@@ -29,6 +29,8 @@ char get_next(std::istream &in){
     return in.get();
 }
 
+Expr *parse_if(std::istream &in);
+Expr *comparg(std::istream &in);
 Expr *addend(std::istream &in);
 Expr *inner(std::istream &in);
 Expr *parse_number(std::istream &in);
@@ -39,26 +41,44 @@ std::string parse_alphabetic(std::istream &in, std::string prefix);
 
 /**
  Return an expression (Expr *) accroding to grammar:
- <expr> = <addend>
- | <addend> + <expr>
+ <expr> = <comparg>
+        | <comparg> + <expr>
  */
 Expr *expr(std::istream &in) {
-    Expr *num = addend(in);
+    Expr *num = comparg(in);
     if(num == nullptr) return nullptr;
     char c = peek_next(in);
-    if (c == '+') {
+    if (c == '=') {
         get_next(in);
+        if(get_next(in) != '=') throw std::runtime_error((std::string)"should be double equal");
         Expr *temp = expr(in);
         if(temp == nullptr) return nullptr;
-        return new AddExpr(num, temp);
+        return new EquExpr(num, temp);
     }
     return num;
 }
 
 /**
+ <conparg> = <addend>
+           | <addend> + <comparg>
+ */
+Expr *comparg(std::istream &in){
+    Expr *add = addend(in);
+    if(add == nullptr) return nullptr;
+    char c = peek_next(in);
+    if(c == '+'){
+        get_next(in);
+        Expr *comp = comparg(in);
+        if(comp == nullptr) return nullptr;
+        return new AddExpr(add, comp);
+    }
+    return add;
+}
+
+/**
  Return an expresion according to grammar:
  <addend> = <number-or-paren>
- | <number-or-paren> * <addend>
+          | <number-or-paren> * <addend>
  */
 Expr *addend(std::istream &in) {
     Expr *num = inner(in);
@@ -76,8 +96,11 @@ Expr *addend(std::istream &in) {
 /**
  Return an expression according to grammar:
  <number-or-paren> = <number>
- | (<expr>)
- | <variable>
+                   | (<expr>)
+                   | <variable>
+                   | _let <variable> = <expr> _in <expr>
+                   | _true/_false
+                   | _if <expr> _then <expr> _else <expr>
  */
 Expr *inner(std::istream &in){
     char c = peek_next(in);
@@ -87,7 +110,7 @@ Expr *inner(std::istream &in){
         if(num == nullptr || peek_next(in) != ')') return nullptr;
         get_next(in);
         return num;
-    } else if (isdigit(c)) { // if is a number
+    } else if (c == '-' || isdigit(c)) { // if is a number(or negative number)
         return parse_number(in);
     } else if (isalpha(c)){ // if is a variable
         return parse_variable(in);
@@ -99,10 +122,21 @@ Expr *inner(std::istream &in){
             return new BoolExpr(false);
         else if (keyword == "_let")
             return let(in);
+        else if (keyword == "_if")
+            return parse_if(in);
         else
             throw std::runtime_error((std::string)"unexpected keyword " + keyword);
     } else
         return nullptr;
+}
+
+Expr *parse_if(std::istream &in){
+    Expr *test_part = expr(in);
+    if(parse_keyword(in) != "_then") throw std::runtime_error((std::string)"unexpected keyword");
+    Expr *then_part = expr(in);
+    if(parse_keyword(in) != "_else") throw std::runtime_error((std::string)"unexpected keyword");
+    Expr *else_part = expr(in);
+    return new IfExpr(test_part, then_part, else_part);
 }
 
 Expr *let(std::istream &in){
@@ -122,9 +156,16 @@ Expr *let(std::istream &in){
 
 // Parses a number, assuming that `in` starts with a digit.
 Expr *parse_number(std::istream &in) {
+    char c = peek_next(in);
+    int flag = 1;
+    if(c == '-'){
+        flag = -1;
+        get_next(in);
+    }
+    if(!isdigit(peek_next(in))) throw std::runtime_error((std::string)"Unexpected number");
     int num = 0;
     in >> num;
-    return new NumExpr(num);
+    return new NumExpr(flag * num);
 }
 
 // Parses an expression, assuming that `in` starts with a
@@ -169,7 +210,7 @@ Expr *parse_str(std::string s){
     return parse(in);
 }
 
-TEST_CASE( "equals" ) {
+TEST_CASE( "parse" ) {
     CHECK((new NumExpr(1))->equals(new NumExpr(1)));
     CHECK(!(new NumExpr(1))->equals(new NumExpr(2)));
     CHECK(!(new NumExpr(1))->equals(new MultExpr(new NumExpr(2), new NumExpr(4))));
@@ -191,4 +232,17 @@ TEST_CASE( "equals" ) {
 
 TEST_CASE("optimize"){
     CHECK(parse_str("_let x = 5 _in _let y = z + 2 _in x + y + (2 * 3)")->optimize()->equals(parse_str("_let y = z + 2 _in 5 + y + 6")));
+    CHECK(parse_str("_let x = (_let y = 7 _in y) _in x")->optimize()->equals(new NumExpr(7)));
+    CHECK(parse_str("_let x = 5 _in _let y = x _in y + y")->optimize()->equals(new NumExpr(10)));
+    CHECK(parse_str("_let x = 5 _in _let x = 12 _in x + y")->optimize()->equals(parse_str("12 + y")));
+    CHECK(parse_str("_if 5 == x _then x + 7 _else 67")->optimize()->equals(parse_str("_if 5 == x _then x + 7 _else 67")));
+}
+
+TEST_CASE("interpreter"){
+    CHECK_THROWS_WITH(parse_str("_let x = 5 _in _let y = z + 2 _in x + y + (2 * 3)")->interp(), "cannot interpret a variable");
+    CHECK(parse_str("_let x = (_let y = 7 _in y) _in x")->interp()->equals(new NumVal(7)));
+    CHECK(parse_str("_let x = 5 _in _let y = x _in y + y")->interp()->equals(new NumVal(10)));
+    CHECK(parse_str("_let x = 6 _in _let x = 19 _in x")->interp()->equals(new NumVal(19)));
+    CHECK(parse_str("_if 5 == 3 _then 2 _else 89")->interp()->equals(new NumVal(89)));
+    CHECK(parse_str("-8 + 3")->interp()->equals(new NumVal(-5)));
 }

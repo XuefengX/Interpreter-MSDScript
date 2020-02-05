@@ -17,6 +17,12 @@
 		DC13364D23E3D3BB00CE1784 /* test.m in Sources */ = {isa = PBXBuildFile; fileRef = DC13364A23E3D3BB00CE1784 /* test.m */; };
 		DC13364E23E3D3BB00CE1784 /* Info.plist in Resources */ = {isa = PBXBuildFile; fileRef = DC13364B23E3D3BB00CE1784 /* Info.plist */; };
 		DC13365123E3D8D000CE1784 /* rand_expr.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DC13364F23E3D8D000CE1784 /* rand_expr.cpp */; };
+		DC44E90723E9FC7C00E08F9F /* fuzz.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DC13363923E3D2BB00CE1784 /* fuzz.cpp */; };
+		DC44E90823E9FC8800E08F9F /* exec.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DC13363623E3D2BB00CE1784 /* exec.cpp */; };
+		DC44E90923E9FC8D00E08F9F /* rand_expr.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DC13364F23E3D8D000CE1784 /* rand_expr.cpp */; };
+		DC44E90A23E9FC9000E08F9F /* expr.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DC13362F23E3D27400CE1784 /* expr.cpp */; };
+		DC44E90C23E9FC9700E08F9F /* parse.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DC13362C23E3D27400CE1784 /* parse.cpp */; };
+		DC44E90D23E9FC9A00E08F9F /* value.cpp in Sources */ = {isa = PBXBuildFile; fileRef = DC13363023E3D27400CE1784 /* value.cpp */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -233,7 +239,13 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				DC44E90923E9FC8D00E08F9F /* rand_expr.cpp in Sources */,
+				DC44E90723E9FC7C00E08F9F /* fuzz.cpp in Sources */,
+				DC44E90A23E9FC9000E08F9F /* expr.cpp in Sources */,
 				DC13364C23E3D3BB00CE1784 /* run.cpp in Sources */,
+				DC44E90D23E9FC9A00E08F9F /* value.cpp in Sources */,
+				DC44E90C23E9FC9700E08F9F /* parse.cpp in Sources */,
+				DC44E90823E9FC8800E08F9F /* exec.cpp in Sources */,
 				DC13364D23E3D3BB00CE1784 /* test.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

@@ -40,6 +40,20 @@ public:
     std::string to_string();
 };
 
+class EquExpr : public Expr{
+public:
+    Expr *lhs;
+    Expr *rhs;
+    
+    EquExpr(Expr *lhs, Expr *rhs);
+    bool equals(Expr *e);
+    Val *interp();
+    Expr *subst(std::string var, Val* new_val);
+    Expr *optimize();
+    bool containsVar();
+    std::string to_string();
+};
+
 class AddExpr : public Expr {
 public:
     Expr *lhs;
@@ -101,6 +115,22 @@ public:
     Expr *body;
     
     LetExpr(std::string let_var, Expr *eq_expr, Expr *in_expr);
+    bool equals(Expr *e);
+    Val *interp();
+    Expr *subst(std::string var, Val* new_val);
+    Expr *optimize();
+    bool containsVar();
+    std::string to_string();
+};
+
+class IfExpr : public Expr{
+public:
+    std::string let_var;
+    Expr *test_part;
+    Expr *then_part;
+    Expr *else_part;
+    
+    IfExpr(Expr *test_part, Expr *then_part, Expr *else_part);
     bool equals(Expr *e);
     Val *interp();
     Expr *subst(std::string var, Val* new_val);

@@ -33,9 +33,13 @@ Val *NumVal::add_to(Val *other_val){
 Val *NumVal::mult_with(Val *other_val){
     NumVal *nv = dynamic_cast<NumVal*>(other_val);
     if(nv == nullptr)
-        throw std::runtime_error((std::string)"Addend is not a number");
+        throw std::runtime_error((std::string)"Mult is not a number");
     else
         return new NumVal(rep * nv->rep);
+}
+
+bool NumVal::is_ture(){
+    throw std::runtime_error((std::string)"evaluate non-boolean");
 }
 
 Expr *NumVal::to_expr(){
@@ -70,6 +74,11 @@ Expr *BoolVal::to_expr(){
     return new BoolExpr(rep);
 }
 
+bool BoolVal::is_ture(){
+    return rep;
+}
+
+
 std::string BoolVal::to_string()
 {
     if (rep)
@@ -94,18 +103,18 @@ TEST_CASE( "add_to" ) {
     
     CHECK ( (new NumVal(5))->add_to(new NumVal(8))->equals(new NumVal(13)) );
     
-    CHECK_THROWS_WITH ( (new NumVal(5))->add_to(new BoolVal(false)), "not a number" );
+    CHECK_THROWS_WITH ( (new NumVal(5))->add_to(new BoolVal(false)), "Addend is not a number" );
     CHECK_THROWS_WITH ( (new BoolVal(false))->add_to(new BoolVal(false)),
-                       "no adding booleans" );
+                       "No adding booleans" );
 }
 
 TEST_CASE( "mult_with" ) {
     
     CHECK ( (new NumVal(5))->mult_with(new NumVal(8))->equals(new NumVal(40)) );
     
-    CHECK_THROWS_WITH ( (new NumVal(5))->mult_with(new BoolVal(false)), "not a number" );
+    CHECK_THROWS_WITH ( (new NumVal(5))->mult_with(new BoolVal(false)), "Mult is not a number" );
     CHECK_THROWS_WITH ( (new BoolVal(false))->mult_with(new BoolVal(false)),
-                       "no multiplying booleans" );
+                       "No multiplying booleans" );
 }
 
 TEST_CASE( "value to_expr" ) {
