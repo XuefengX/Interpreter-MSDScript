@@ -213,6 +213,37 @@ std::string BoolExpr::to_string(){
     return interp()->to_string();
 }
 
+
+CallExpr::CallExpr(Expr *to_be_called, Expr *actual_arg){
+    this->to_be_called = to_be_called;
+    this->actual_arg = actual_arg;
+}
+
+bool CallExpr::equals(Expr *e){
+    CallExpr *ce = dynamic_cast<CallExpr *>(e);
+    return to_be_called->equals(ce->to_be_called) && actual_arg->equals(ce->actual_arg);
+}
+
+Val *CallExpr::interp(){
+    return to_be_called->interp()->call(actual_arg->interp());
+}
+
+Expr *CallExpr::subst(std::string var, Val* new_val){
+    return new CallExpr(to_be_called->subst(var, new_val), actual_arg);
+}
+
+Expr *CallExpr::optimize(){
+    return new CallExpr(to_be_called->optimize(), actual_arg->optimize());
+}
+
+bool CallExpr::containsVar(){
+    return actual_arg->containsVar();
+}
+
+std::string CallExpr::to_string(){
+    return to_be_called->to_string() + "(" + actual_arg->to_string() + ")";
+}
+
 LetExpr::LetExpr(std::string let_var, Expr *eq_expr, Expr *in_expr){
     this->let_var = let_var;
     this->rhs = eq_expr;
@@ -301,6 +332,40 @@ bool IfExpr::containsVar(){
 std::string IfExpr::to_string(){
     return "_if " + test_part->to_string() + " _then " + then_part->to_string() + " _else " + else_part->to_string();
 }
+
+FuncExpr::FuncExpr(std::string formal_arg, Expr *body){
+    this->formal_arg = formal_arg;
+    this->body = body;
+}
+
+bool FuncExpr::equals(Expr *e){
+    FuncExpr *fe = dynamic_cast<FuncExpr *>(e);
+    return formal_arg == fe->formal_arg && body->equals(fe->body);
+}
+
+Val *FuncExpr::interp(){
+    return new FuncVal(formal_arg, body);
+}
+
+Expr *FuncExpr::subst(std::string var, Val* new_val){
+    if(var == formal_arg)
+        return this;
+    else
+        return new FuncExpr(formal_arg, body->subst(var, new_val));
+}
+
+Expr *FuncExpr::optimize(){
+    return new FuncExpr(formal_arg, body->optimize());
+}
+
+bool FuncExpr::containsVar(){
+    return body->containsVar();
+}
+
+std::string FuncExpr::to_string(){
+    return "_fun (" + formal_arg + ") " + body->to_string();
+}
+
 
 TEST_CASE( "equals" ) {
     CHECK( (new NumExpr(1))->equals(new NumExpr(1)) );

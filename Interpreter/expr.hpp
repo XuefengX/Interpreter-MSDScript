@@ -108,6 +108,20 @@ public:
     std::string to_string();
 };
 
+class CallExpr : public Expr{
+public:
+    Expr* to_be_called;
+    Expr* actual_arg;
+    
+    CallExpr(Expr *to_be_called, Expr *actual_arg);
+    bool equals(Expr *e);
+    Val *interp();
+    Expr *subst(std::string var, Val* new_val);
+    Expr *optimize();
+    bool containsVar();
+    std::string to_string();
+};
+
 class LetExpr : public Expr{
 public:
     std::string let_var;
@@ -125,12 +139,25 @@ public:
 
 class IfExpr : public Expr{
 public:
-    std::string let_var;
     Expr *test_part;
     Expr *then_part;
     Expr *else_part;
     
     IfExpr(Expr *test_part, Expr *then_part, Expr *else_part);
+    bool equals(Expr *e);
+    Val *interp();
+    Expr *subst(std::string var, Val* new_val);
+    Expr *optimize();
+    bool containsVar();
+    std::string to_string();
+};
+
+class FuncExpr : public Expr{
+public:
+    std::string formal_arg;
+    Expr *body;
+    
+    FuncExpr(std::string formal_arg, Expr *body);
     bool equals(Expr *e);
     Val *interp();
     Expr *subst(std::string var, Val* new_val);

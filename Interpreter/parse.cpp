@@ -32,10 +32,12 @@ char get_next(std::istream &in){
 Expr *parse_if(std::istream &in);
 Expr *comparg(std::istream &in);
 Expr *addend(std::istream &in);
+Expr *multicand(std::istream &in);
 Expr *inner(std::istream &in);
 Expr *parse_number(std::istream &in);
 Expr *parse_variable(std::istream &in);
 Expr *let(std::istream &in);
+Expr *parse_fun(std::istream &in);
 std::string parse_keyword(std::istream &in);
 std::string parse_alphabetic(std::istream &in, std::string prefix);
 
@@ -77,11 +79,11 @@ Expr *comparg(std::istream &in){
 
 /**
  Return an expresion according to grammar:
- <addend> = <number-or-paren>
-          | <number-or-paren> * <addend>
+ <addend> = <multicand>
+          | <multicand> * <addend>
  */
 Expr *addend(std::istream &in) {
-    Expr *num = inner(in);
+    Expr *num = multicand(in);
     if(num == nullptr) return nullptr;
     char c = peek_next(in);
     if (c == '*') {
@@ -94,6 +96,19 @@ Expr *addend(std::istream &in) {
 }
 
 /**
+ <multicand> = <inner>
+             | <multicand> ( <expr> )
+ */
+Expr *multicand(std::istream &in) {
+    Expr *temp = inner(in);
+    while (peek_next(in) == '(') {
+        Expr *actual_arg = expr(in);
+        temp = new CallExpr(temp, actual_arg);
+    }
+    return temp;
+}
+
+/**
  Return an expression according to grammar:
  <number-or-paren> = <number>
                    | (<expr>)
@@ -101,6 +116,7 @@ Expr *addend(std::istream &in) {
                    | _let <variable> = <expr> _in <expr>
                    | _true/_false
                    | _if <expr> _then <expr> _else <expr>
+                   | _fun ( <variable> ) <expr>
  */
 Expr *inner(std::istream &in){
     char c = peek_next(in);
@@ -124,6 +140,8 @@ Expr *inner(std::istream &in){
             return let(in);
         else if (keyword == "_if")
             return parse_if(in);
+        else if (keyword == "_fun")
+            return parse_fun(in);
         else
             throw std::runtime_error((std::string)"unexpected keyword " + keyword);
     } else
@@ -174,6 +192,23 @@ Expr *parse_variable(std::istream &in) {
     return new VarExpr(parse_alphabetic(in, ""));
 }
 
+// Parse a function
+Expr *parse_fun(std::istream &in){
+    char c = peek_next(in);
+    if(c == '('){
+        get_next(in);
+        peek_next(in);
+        std::string formal_var = parse_alphabetic(in, "");
+        c = peek_next(in);
+        if(c != ')')
+            throw std::runtime_error((std::string)"not a function format");
+        get_next(in);
+        Expr *body = expr(in);
+        return new FuncExpr(formal_var, body);
+    } else
+        throw std::runtime_error((std::string)"not a function format");
+}
+
 // Parses an expression, assuming that `in` starts with a
 // letter.
 std::string parse_keyword(std::istream &in) {
@@ -210,6 +245,7 @@ Expr *parse_str(std::string s){
     return parse(in);
 }
 
+
 TEST_CASE( "parse" ) {
     CHECK((new NumExpr(1))->equals(new NumExpr(1)));
     CHECK(!(new NumExpr(1))->equals(new NumExpr(2)));
@@ -245,4 +281,9 @@ TEST_CASE("interpreter"){
     CHECK(parse_str("_let x = 6 _in _let x = 19 _in x")->interp()->equals(new NumVal(19)));
     CHECK(parse_str("_if 5 == 3 _then 2 _else 89")->interp()->equals(new NumVal(89)));
     CHECK(parse_str("-8 + 3")->interp()->equals(new NumVal(-5)));
+}
+
+TEST_CASE("function"){
+    CHECK(parse_str("_fun (x) x + 1")->equals(new FuncExpr("x", new AddExpr( new VarExpr("x"), new NumExpr(1)))));
+    CHECK(parse_str("_let f = _fun (x) x + 1 _in f(10)")->interp()->equals(new NumVal(11)));
 }

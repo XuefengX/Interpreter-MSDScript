@@ -20,6 +20,7 @@ public:
     virtual Val *mult_with(Val *other_val) = 0;
     virtual bool is_ture() = 0;
     virtual Expr *to_expr() = 0;
+    virtual Val *call(Val *actual_arg) = 0;
     virtual std::string to_string() = 0;
 };
 
@@ -33,6 +34,7 @@ public:
     Val *mult_with(Val *other_val);
     bool is_ture();
     Expr *to_expr();
+    Val *call(Val *actual_arg);
     std::string to_string();
 };
 
@@ -46,8 +48,23 @@ public:
     Val *mult_with(Val *other_val);
     bool is_ture();
     Expr *to_expr();
+    Val *call(Val *actual_arg);
     std::string to_string();
 };
 
+class FuncVal : public Val{
+public:
+    std::string formal_arg;
+    Expr *body;
+    
+    FuncVal(std::string formal_arg, Expr *body);
+    bool equals(Val *other_val);
+    Val *add_to(Val *other_val);
+    Val *mult_with(Val *other_val);
+    bool is_ture();
+    Expr *to_expr();
+    Val *call(Val *actual_arg);
+    std::string to_string();
+};
 
 #endif /* value_hpp */

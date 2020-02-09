@@ -46,6 +46,10 @@ Expr *NumVal::to_expr(){
     return new NumExpr(rep);
 }
 
+Val *NumVal::call(Val *actual_arg){
+    return this;
+}
+
 std::string NumVal::to_string(){
     return std::to_string(rep);
 }
@@ -78,6 +82,9 @@ bool BoolVal::is_ture(){
     return rep;
 }
 
+Val *BoolVal::call(Val *actual_arg){
+    return this;
+}
 
 std::string BoolVal::to_string()
 {
@@ -85,6 +92,41 @@ std::string BoolVal::to_string()
         return "_true";
     else
         return "_false";
+}
+
+FuncVal::FuncVal(std::string formal_arg, Expr *body){
+    this->formal_arg = formal_arg;
+    this->body = body;
+}
+
+bool FuncVal::equals(Val *other_val){
+    FuncVal *fv = dynamic_cast<FuncVal *>(other_val);
+    return formal_arg == fv->formal_arg && body->equals(fv->body);
+}
+
+Val *FuncVal::add_to(Val *other_val){
+    throw std::runtime_error((std::string)"No adding functions");
+}
+
+Val *FuncVal::mult_with(Val *other_val){
+    throw std::runtime_error((std::string)"No multiplying functions");
+}
+
+bool FuncVal::is_ture(){
+    throw std::runtime_error((std::string)"evaluate non-boolean");
+}
+
+Expr *FuncVal::to_expr(){
+    return new FuncExpr(formal_arg, body);
+}
+
+Val *FuncVal::call(Val *actual_arg){
+    Expr * new_body = body->subst(formal_arg, actual_arg);
+    return new_body->interp();
+}
+
+std::string FuncVal::to_string(){
+    return "_fun (" + formal_arg + ") " + body->to_string();
 }
 
 TEST_CASE( "values equals" ) {

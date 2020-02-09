@@ -1,8 +1,18 @@
 # Interpreter-MSDScript
 A basic interpreter for a new programming language-MSDScript. 
 
-* The Syntax of the MSDScript is like this:  
-![](img/1.png)
+* The Syntax of the MSDScript is like this:   
+   ```
+    _let fib = _fun (fib)
+                 _fun (x)
+                    _if x == 0
+                    _then 1
+                    _else _if x == 2 + -1
+                    _then 1
+                    _else fib(fib)(x + -1)
+                          + fib(fib)(x + -2)
+    _in fib(fib)(10)
+   ```
 
 * Functions of MSDScript include: arithmetic/boolean parser, variable binding, functions, explicit continuations.
 
@@ -77,3 +87,24 @@ Working log:
 
 * Feb 5, 2020
     1. Improve the performance of the interpreter and fix bugs.
+
+* Feb 9, 2020
+    Add support for functions.
+   As a kind of stress test, this program should work for the interpreter:
+
+   ```
+    _let fib = _fun (fib)
+                 _fun (x)
+                    _if x == 0
+                    _then 1
+                    _else _if x == 2 + -1
+                    _then 1
+                    _else fib(fib)(x + -1)
+                          + fib(fib)(x + -2)
+    _in fib(fib)(10)
+   ```
+
+   and the result should be `89`. The optimized form of that program should
+   be the same, except that `2 + -1` expression in the middle should be
+   optimized to just `1`.
+
