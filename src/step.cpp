@@ -27,6 +27,7 @@ PTR(Val) Step::interp_by_steps(PTR(Expr) e) {
     Step::cont = Cont::done;
     
     while (1) {
+        GCable::check_collect();
         if (Step::mode == Step::interp_mode)
             Step::expr->step_interp();
         else {
