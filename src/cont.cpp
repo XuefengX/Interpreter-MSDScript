@@ -21,6 +21,13 @@ void DoneCont::step_continue() {
     throw std::runtime_error("can't continue done");
 }
 
+int DoneCont::size() {
+    return sizeof(DoneCont);
+}
+
+void DoneCont::trace() {
+    
+}
 
 RightThenAddCont::RightThenAddCont(PTR(Expr) rhs, PTR(Env) env, PTR(Cont) rest) {
     this->rhs = rhs;
@@ -36,6 +43,16 @@ void RightThenAddCont::step_continue() {
     Step::cont = NEW(AddCont)(lhs_val, rest);
 }
 
+int RightThenAddCont::size() {
+    return sizeof(RightThenAddCont);
+}
+
+void RightThenAddCont::trace() {
+    UPDATE(rhs);
+    UPDATE(env);
+    UPDATE(rest);
+}
+
 AddCont::AddCont(PTR(Val) lhs_val, PTR(Cont) rest) {
     this->lhs_val = lhs_val;
     this->rest = rest;
@@ -46,6 +63,15 @@ void AddCont::step_continue() {
     Step::mode = Step::continue_mode;
     Step::val = lhs_val->add_to(rhs_val);
     Step::cont = rest;
+}
+
+int AddCont::size() {
+    return sizeof(AddCont);
+}
+
+void AddCont::trace() {
+    UPDATE(lhs_val);
+    UPDATE(rest);
 }
 
 RightThenMultCont::RightThenMultCont(PTR(Expr) rhs, PTR(Env) env, PTR(Cont) rest) {
@@ -62,6 +88,16 @@ void RightThenMultCont::step_continue() {
     Step::cont = NEW(MultCont)(lhs_val, rest);
 }
 
+int RightThenMultCont::size() {
+    return sizeof(RightThenMultCont);
+}
+
+void RightThenMultCont::trace() {
+    UPDATE(rhs);
+    UPDATE(env);
+    UPDATE(rest);
+}
+
 MultCont::MultCont(PTR(Val) lhs_val, PTR(Cont) rest) {
     this->lhs_val = lhs_val;
     this->rest = rest;
@@ -72,6 +108,15 @@ void MultCont::step_continue() {
     Step::mode = Step::continue_mode;
     Step::val = lhs_val->mult_with(rhs_val);
     Step::cont = rest;
+}
+
+int MultCont::size() {
+    return sizeof(MultCont);
+}
+
+void MultCont::trace() {
+    UPDATE(lhs_val);
+    UPDATE(rest);
 }
 
 RightThenCompCont::RightThenCompCont(PTR(Expr) rhs, PTR(Env) env, PTR(Cont) rest) {
@@ -86,6 +131,16 @@ void RightThenCompCont::step_continue() {
     Step::expr = rhs;
     Step::env = env;
     Step::cont = NEW(CompCont)(lhs_val, rest);
+}
+
+int RightThenCompCont::size() {
+    return sizeof(RightThenCompCont);
+}
+
+void RightThenCompCont::trace() {
+    UPDATE(rhs);
+    UPDATE(env);
+    UPDATE(rest);
 }
 
 CompCont::CompCont(PTR(Val) lhs_val, PTR(Cont) rest) {
@@ -103,6 +158,15 @@ void CompCont::step_continue() {
     Step::cont = rest;
 }
 
+int CompCont::size() {
+    return sizeof(CompCont);
+}
+
+void CompCont::trace() {
+    UPDATE(lhs_val);
+    UPDATE(rest);
+}
+
 ArgThenCallCont::ArgThenCallCont(PTR(Expr) actual_arg, PTR(Env) env, PTR(Cont) rest) {
     this->actual_arg = actual_arg;
     this->env = env;
@@ -117,6 +181,16 @@ void ArgThenCallCont::step_continue() {
     Step::cont = NEW(CallCont)(to_be_called, rest);
 }
 
+int ArgThenCallCont::size() {
+    return sizeof(ArgThenCallCont);
+}
+
+void ArgThenCallCont::trace() {
+    UPDATE(actual_arg);
+    UPDATE(env);
+    UPDATE(rest);
+}
+
 CallCont::CallCont(PTR(Val) to_be_called, PTR(Cont) rest) {
     this->to_be_called = to_be_called;
     this->rest = rest;
@@ -124,6 +198,15 @@ CallCont::CallCont(PTR(Val) to_be_called, PTR(Cont) rest) {
 
 void CallCont::step_continue() {
     to_be_called->call_step(Step::val, rest);
+}
+
+int CallCont::size() {
+    return sizeof(CallCont);
+}
+
+void CallCont::trace() {
+    UPDATE(to_be_called);
+    UPDATE(rest);
 }
 
 IfBranchCont::IfBranchCont(PTR(Expr) then_part, PTR(Expr) else_part, PTR(Env) env, PTR(Cont) rest) {
@@ -147,6 +230,17 @@ void IfBranchCont::step_continue() {
     Step::cont = rest;
 }
 
+int IfBranchCont::size() {
+    return sizeof(IfBranchCont);
+}
+
+void IfBranchCont::trace() {
+    UPDATE(then_part);
+    UPDATE(else_part);
+    UPDATE(env);
+    UPDATE(rest);
+}
+
 LetBodyCont::LetBodyCont(std::string var, PTR(Expr) body, PTR(Env) env, PTR(Cont) rest) {
     this->var = var;
     this->body = body;
@@ -160,4 +254,14 @@ void LetBodyCont::step_continue() {
     Step::env = NEW(ExtendedEnv)(var, rhs_val, Step::env);
     Step::expr = body;
     Step::cont = rest;
+}
+
+int LetBodyCont::size() {
+    return sizeof(LetBodyCont);
+}
+
+void LetBodyCont::trace() {
+    UPDATE(body);
+    UPDATE(env);
+    UPDATE(rest);
 }

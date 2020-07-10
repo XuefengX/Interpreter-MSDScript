@@ -9,14 +9,15 @@
 #ifndef cont_hpp
 #define cont_hpp
 
-#include <iostream>
+#include "gcable.hpp"
 #include "pointer.hpp"
+#include <iostream>
 
 class Expr;
 class Val;
 class Env;
 
-class Cont ENABLE_THIS(Cont) {
+class Cont ENABLE_THIS(Cont) : public GCable {
 public:
     /* To take one step in the computation starting
      with this continuation, reading from the registers
@@ -36,6 +37,9 @@ class DoneCont : public Cont {
 public:
     DoneCont();
     void step_continue();
+    
+    int size();
+    void trace();
 };
 
 class RightThenAddCont : public Cont {
@@ -46,6 +50,9 @@ public:
     
     RightThenAddCont(PTR(Expr) rhs, PTR(Env) env, PTR(Cont) rest);
     void step_continue();
+    
+    int size();
+    void trace();
 };
 
 class AddCont : public Cont {
@@ -55,6 +62,9 @@ public:
     
     AddCont(PTR(Val) lhs_val, PTR(Cont) rest);
     void step_continue();
+    
+    int size();
+    void trace();
 };
 
 class RightThenMultCont : public Cont {
@@ -65,6 +75,9 @@ public:
     
     RightThenMultCont(PTR(Expr) rhs, PTR(Env) env, PTR(Cont) rest);
     void step_continue();
+    
+    int size();
+    void trace();
 };
 
 class MultCont : public Cont {
@@ -74,6 +87,9 @@ public:
     
     MultCont(PTR(Val) lhs_val, PTR(Cont) rest);
     void step_continue();
+    
+    int size();
+    void trace();
 };
 
 class RightThenCompCont : public Cont {
@@ -84,6 +100,9 @@ public:
     
     RightThenCompCont(PTR(Expr) rhs, PTR(Env) env, PTR(Cont) rest);
     void step_continue();
+    
+    int size();
+    void trace();
 };
 
 class CompCont : public Cont {
@@ -93,6 +112,9 @@ public:
     
     CompCont(PTR(Val) lhs_val, PTR(Cont) rest);
     void step_continue();
+    
+    int size();
+    void trace();
 };
 
 class ArgThenCallCont : public Cont {
@@ -103,6 +125,9 @@ public:
     
     ArgThenCallCont(PTR(Expr) actual_arg, PTR(Env) env, PTR(Cont) rest);
     void step_continue();
+    
+    int size();
+    void trace();
 };
 
 class CallCont : public Cont {
@@ -112,6 +137,9 @@ public:
     
     CallCont(PTR(Val) to_be_called, PTR(Cont) rest);
     void step_continue();
+    
+    int size();
+    void trace();
 };
 
 class IfBranchCont : public Cont {
@@ -123,6 +151,9 @@ public:
     
     IfBranchCont(PTR(Expr) then_part, PTR(Expr) else_part, PTR(Env) env, PTR(Cont) rest);
     void step_continue();
+    
+    int size();
+    void trace();
 };
 
 class LetBodyCont : public Cont {
@@ -134,6 +165,10 @@ public:
     
     LetBodyCont(std::string var, PTR(Expr) body, PTR(Env) env, PTR(Cont) rest);
     void step_continue();
+    
+    int size();
+    void trace();
 };
+
 
 #endif /* cont_hpp */

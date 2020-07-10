@@ -1,7 +1,10 @@
 # MSDScript
 
+*Test version using garbage collector*    
+*stable version using reference count resides in main branch*
+
 by _**Xuefeng Xu**_   
-Version: _1.0.1_
+Test Version: _1.1.1_
 
 ---
 

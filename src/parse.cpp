@@ -14,130 +14,120 @@
 #include "value.hpp"
 #include "step.hpp"
 
-/**
- Ignore all the blankspace and return the next character in the input stream without change it
- Param: istream in - input stream
- Return: first char in the stream without space
- */
-char peek_next(std::istream &in){
-    while(in.peek() == ' ' || in.peek() == '\n')
-        in.get();
-    return in.peek();
+PTR(Expr) parse(std::istream &in);
+static PTR(Expr) parse_expr(std::istream &in);
+static PTR(Expr) parse_comparg(std::istream &in);
+static PTR(Expr) parse_addend(std::istream &in);
+static PTR(Expr) parse_multicand(std::istream &in);
+static PTR(Expr) parse_inner(std::istream &in);
+static PTR(Expr) parse_number(std::istream &in);
+static PTR(Expr) parse_variable(std::istream &in);
+static PTR(Expr) parse_let(std::istream &in);
+static PTR(Expr) parse_if(std::istream &in);
+static PTR(Expr) parse_fun(std::istream &in);
+static std::string parse_keyword(std::istream &in);
+static std::string parse_alphabetic(std::istream &in, std::string prefix);
+static char peek_after_spaces(std::istream &in);
+
+// Take an input stream that contains an expression,
+// and returns the parsed representation of that expression.
+// Throws `runtime_error` for parse errors.
+PTR(Expr) parse(std::istream &in) {
+    PTR(Expr) e = parse_expr(in);
+    
+    // This peek is currently redundant, since we would have
+    // consumed whitespace to decide that the expression
+    // doesn't continue.
+    char c = peek_after_spaces(in);
+    if (!in.eof())
+        throw std::runtime_error((std::string)"expected end of file at " + c);
+    
+    return e;
 }
 
-/**
- Get the next non-space character
- */
-char get_next(std::istream &in){
-    peek_next(in);
-    return in.get();
-}
-
-PTR(Expr) parse_if(std::istream &in);
-PTR(Expr) parse_comparg(std::istream &in);
-PTR(Expr) parse_addend(std::istream &in);
-PTR(Expr) parse_multicand(std::istream &in);
-PTR(Expr) parse_inner(std::istream &in);
-PTR(Expr) parse_number(std::istream &in);
-PTR(Expr) parse_variable(std::istream &in);
-PTR(Expr) parse_let(std::istream &in);
-PTR(Expr) parse_fun(std::istream &in);
-std::string parse_keyword(std::istream &in);
-std::string parse_alphabetic(std::istream &in, std::string prefix);
-
-/**
- Return an expression (PTR(Expr) ) accroding to grammar:
- <expr> = <comparg>
-        | <comparg> + <expr>
- */
-PTR(Expr) parse_expr(std::istream &in) {
-    PTR(Expr) num = parse_comparg(in);
-    if(num == nullptr) return nullptr;
-    char c = peek_next(in);
+// Takes an input stream that starts with an expression,
+// consuming the largest initial expression possible.
+static PTR(Expr) parse_expr(std::istream &in) {
+    PTR(Expr) e = parse_comparg(in);
+    
+    char c = peek_after_spaces(in);
+    
     if (c == '=') {
-        get_next(in);
-        if(get_next(in) != '=') throw std::runtime_error((std::string)"should be double equal");
-        PTR(Expr) temp = parse_expr(in);
-        if(temp == nullptr) return nullptr;
-        return NEW(EquExpr)(num, temp);
+        in >> c;
+        in >> c;
+        
+        if (c != '=') {
+            throw std::runtime_error((std::string)"expected == at =" + c);
+        }
+        
+        PTR(Expr) rhs = parse_expr(in);
+        e = NEW(CompExpr)(e, rhs);
     }
-    return num;
+    
+    return e;
 }
 
-/**
- <conparg> = <addend>
-           | <addend> + <comparg>
- */
-PTR(Expr) parse_comparg(std::istream &in){
-    PTR(Expr) add = parse_addend(in);
-    if(add == nullptr) return nullptr;
-    char c = peek_next(in);
-    if(c == '+'){
-        get_next(in);
-        PTR(Expr) comp = parse_comparg(in);
-        if(comp == nullptr) return nullptr;
-        return NEW(AddExpr)(add, comp);
+static PTR(Expr) parse_comparg(std::istream &in) {
+    PTR(Expr) e = parse_addend(in);
+    
+    char c = peek_after_spaces(in);
+    if (c == '+') {
+        in >> c;
+        PTR(Expr) rhs = parse_comparg(in);
+        e = NEW(AddExpr)(e, rhs);
     }
-    return add;
+    
+    return e;
 }
 
-/**
- Return an expresion according to grammar:
- <addend> = <multicand>
-          | <multicand> * <addend>
- */
-PTR(Expr) parse_addend(std::istream &in) {
-    PTR(Expr) num = parse_multicand(in);
-    if(num == nullptr) return nullptr;
-    char c = peek_next(in);
+// Takes an input stream that starts with an addend,
+// consuming the largest initial addend possible, where
+// an addend is an expression that does not have `+`
+// except within nested expressions (like parentheses).
+static PTR(Expr) parse_addend(std::istream &in) {
+    PTR(Expr) e = parse_multicand(in);
+    
+    char c = peek_after_spaces(in);
     if (c == '*') {
-        get_next(in);
-        PTR(Expr) temp = parse_addend(in);
-        if(temp == nullptr) return nullptr;
-        return NEW(MultExpr)(num, temp);
+        c = in.get();
+        PTR(Expr) rhs = parse_addend(in);
+        e = NEW(MultExpr)(e, rhs);
     }
-    return num;
+    
+    return e;
 }
 
-/**
- <multicand> = <inner>
-             | <multicand> ( <expr> )
- */
-PTR(Expr) parse_multicand(std::istream &in) {
-    PTR(Expr) temp = parse_inner(in);
-    while (peek_next(in) == '(') {
-        get_next(in);
-        PTR(Expr) actual_arg = parse_expr(in);
-        if(get_next(in) != ')')
-            throw std::runtime_error((std::string)"bad format");
-        temp = NEW(CallExpr)(temp, actual_arg);
+static PTR(Expr) parse_multicand(std::istream &in) {
+    PTR(Expr) e = parse_inner(in);
+    
+    while (peek_after_spaces(in) == '(') {
+        PTR(Expr) actual_arg = parse_inner(in);
+        e = NEW(CallFunExpr)(e, actual_arg);
     }
-    return temp;
+    
+    return e;
 }
 
-/**
- Return an expression according to grammar:
- <number-or-paren> = <number>
-                   | (<expr>)
-                   | <variable>
-                   | _let <variable> = <expr> _in <expr>
-                   | _true/_false
-                   | _if <expr> _then <expr> _else <expr>
-                   | _fun ( <variable> ) <expr>
- */
-PTR(Expr) parse_inner(std::istream &in){
-    char c = peek_next(in);
-    if (c == '(') { // if is a parenthesis
-        get_next(in);
-        PTR(Expr) num = parse_expr(in);
-        if(num == nullptr || peek_next(in) != ')') return nullptr;
-        get_next(in);
-        return num;
-    } else if (c == '-' || isdigit(c)) { // if is a number(or negative number)
-        return parse_number(in);
-    } else if (isalpha(c)){ // if is a variable
-        return parse_variable(in);
-    } else if (c == '_'){
+
+// Parses something with no immediate `+` or `*` from `in`.
+static PTR(Expr) parse_inner(std::istream &in) {
+    PTR(Expr) e;
+    
+    char c = peek_after_spaces(in);
+    
+    if (c == '(') {
+        c = in.get();
+        e = parse_expr(in);
+        c = peek_after_spaces(in);
+        if (c == ')')
+            c = in.get();
+            else
+                throw std::runtime_error((std::string)"expected a close parenthesis");
+    } else if (c == '-' || isdigit(c)) {
+        e = parse_number(in);
+    } else if (isalpha(c)) {
+        e = parse_variable(in);
+    } else if (c == '_') {
         std::string keyword = parse_keyword(in);
         if (keyword == "_true")
             return NEW(BoolExpr)(true);
@@ -145,88 +135,54 @@ PTR(Expr) parse_inner(std::istream &in){
             return NEW(BoolExpr)(false);
         else if (keyword == "_let")
             return parse_let(in);
-        else if (keyword == "_if")
-            return parse_if(in);
-        else if (keyword == "_fun")
-            return parse_fun(in);
-        else
-            throw std::runtime_error((std::string)"unexpected keyword " + keyword);
-    } else
-        return nullptr;
+            else if (keyword == "_if")
+                return parse_if(in);
+                else if (keyword == "_fun")
+                    return parse_fun(in);
+                    else
+                        throw std::runtime_error((std::string)"unexpected keyword " + keyword);
+    } else {
+        throw std::runtime_error((std::string)"expected a digit or open parenthesis at " + c);
+    }
+    
+    return e;
 }
-
-PTR(Expr) parse_if(std::istream &in){
-    PTR(Expr) test_part = parse_expr(in);
-    if(parse_keyword(in) != "_then") throw std::runtime_error((std::string)"unexpected keyword");
-    PTR(Expr) then_part = parse_expr(in);
-    if(parse_keyword(in) != "_else") throw std::runtime_error((std::string)"unexpected keyword");
-    PTR(Expr) else_part = parse_expr(in);
-    return NEW(IfExpr)(test_part, then_part, else_part);
-}
-
-PTR(Expr) parse_let(std::istream &in){
-    peek_next(in);
-    std::string variable = parse_alphabetic(in, "");
-    char c = peek_next(in);
-    if(c != '=')
-        throw std::runtime_error((std::string)"Should have = keyword");
-    in.get();
-    PTR(Expr) fe = parse_expr(in);
-    std::string in_string = parse_keyword(in);
-    if(in_string != "_in")
-        throw std::runtime_error((std::string)"Should have _in keyword");
-    PTR(Expr) se = parse_expr(in);
-    return NEW(LetExpr)(variable, fe, se);
-}
-
 
 // Parses a number, assuming that `in` starts with a digit.
-PTR(Expr) parse_number(std::istream &in) {
-    char c = peek_next(in);
-    int flag = 1;
-    if(c == '-'){
-        flag = -1;
-        get_next(in);
+static PTR(Expr) parse_number(std::istream &in) {
+    char next = in.peek();
+    
+    bool isNegative = false;
+    if (next == '-') {
+        isNegative = true;
+        in.get();
     }
-    if(!isdigit(peek_next(in))) throw std::runtime_error((std::string)"Unexpected number");
+    
     int num = 0;
     in >> num;
-    return NEW(NumExpr)(flag * num);
+    
+    if (isNegative)
+        return NEW(NumExpr)(-num);
+    else
+        return NEW(NumExpr)(num);
 }
 
 // Parses an expression, assuming that `in` starts with a
 // letter.
-PTR(Expr) parse_variable(std::istream &in) {
+static PTR(Expr) parse_variable(std::istream &in) {
     return NEW(VarExpr)(parse_alphabetic(in, ""));
 }
 
-// Parse a function
-PTR(Expr) parse_fun(std::istream &in){
-    char c = peek_next(in);
-    if(c == '('){
-        get_next(in);
-        peek_next(in);
-        std::string formal_var = parse_alphabetic(in, "");
-        c = peek_next(in);
-        if(c != ')')
-            throw std::runtime_error((std::string)"not a function format");
-        get_next(in);
-        PTR(Expr) body = parse_expr(in);
-        return NEW(FuncExpr)(formal_var, body);
-    } else
-        throw std::runtime_error((std::string)"not a function format");
-}
-
 // Parses an expression, assuming that `in` starts with a
 // letter.
-std::string parse_keyword(std::istream &in) {
-    get_next(in); // consume `_`
+static std::string parse_keyword(std::istream &in) {
+    in.get(); // consume `_`
     return parse_alphabetic(in, "_");
 }
 
 // Parses an expression, assuming that `in` starts with a
 // letter.
-std::string parse_alphabetic(std::istream &in, std::string prefix) {
+static std::string parse_alphabetic(std::istream &in, std::string prefix) {
     std::string name = prefix;
     while (1) {
         char c = in.peek();
@@ -237,63 +193,249 @@ std::string parse_alphabetic(std::istream &in, std::string prefix) {
     return name;
 }
 
-/**
- Parse input stream into an Expr object and return
- */
-PTR(Expr) parse(std::istream &in){
-    return parse_expr(in);
+// Like in.peek(), but consume an whitespace at the
+// start of `in`
+static char peek_after_spaces(std::istream &in) {
+    char c;
+    while (1) {
+        c = in.peek();
+        if (!isspace(c))
+            break;
+        c = in.get();
+    }
+    return c;
 }
 
-/**
- Convert the string into an istream and all parse to read the stream and
- parse the string into a Expr object
- */
-PTR(Expr) parse_str(std::string s){
+/* for tests */
+static PTR(Expr) parse_str(std::string s) {
     std::istringstream in(s);
     return parse(in);
 }
 
+/* for tests */
+static std::string parse_str_error(std::string s) {
+    std::istringstream in(s);
+    try {
+        (void)parse(in);
+        return "";
+    } catch (std::runtime_error exn) {
+        return exn.what();
+    }
+}
 
-TEST_CASE( "parse" ) {
-    CHECK((NEW(NumExpr)(1))->equals(NEW(NumExpr)(1)));
-    CHECK(!(NEW(NumExpr)(1))->equals(NEW(NumExpr)(2)));
-    CHECK(!(NEW(NumExpr)(1))->equals(NEW(MultExpr)(NEW(NumExpr)(2), NEW(NumExpr)(4))));
-    CHECK((NEW(VarExpr)("hello"))->equals(NEW(VarExpr)("hello")));
-    CHECK(!(NEW(VarExpr)("hello"))->equals(NEW(VarExpr)("ello")));
-    CHECK(peek_next(*(NEW(std::istringstream)("hello"))) == 'h');
-    CHECK(peek_next(*(NEW(std::istringstream)("   hello"))) == 'h');
-    CHECK(get_next(*(NEW(std::istringstream)("   hello"))) == 'h');
-    CHECK(parse_str("1")->equals(NEW(NumExpr)(1)));
-    CHECK(parse_str("  1")->equals(NEW(NumExpr)(1)));
-    CHECK(parse_str("4+2")->equals(NEW(AddExpr)(NEW(NumExpr)(4), NEW(NumExpr)(2))));
-    CHECK(parse_str("   45 +    23")->equals(NEW(AddExpr)(NEW(NumExpr)(45), NEW(NumExpr)(23))));
-    CHECK(parse_str("   45   *  23   ")->equals(NEW(MultExpr)(NEW(NumExpr)(45), NEW(NumExpr)(23))));
-    CHECK(parse_str("(90)")->equals(NEW(NumExpr)(90)));
-    CHECK(parse_str("3*(2+43)")->equals(NEW(MultExpr)(NEW(NumExpr)(3),NEW(AddExpr)(NEW(NumExpr)(2), NEW(NumExpr)(43)))));
-    CHECK(parse_str("Hello")->equals(NEW(VarExpr)("Hello")));
-    CHECK(parse_str("3*(2+width)")->equals(NEW(MultExpr)(NEW(NumExpr)(3),NEW(AddExpr)(NEW(NumExpr)(2), NEW(VarExpr)("width")))));
+static PTR(Expr) parse_let(std::istream &in) {
+    peek_after_spaces(in);
+    std::string varName = parse_alphabetic(in, "");
+    
+    if (varName == "") {
+        throw std::runtime_error((std::string)"variable name error");
+    }
+    
+    char c = peek_after_spaces(in);
+    if (c != '=') {
+        throw std::runtime_error((std::string)"expected =, but found " + c);
+    }
+    
+    c = in.get();
+    
+    PTR(Expr) rhs = parse_expr(in);
+    
+    std::string _in = parse_keyword(in);
+    
+    if (_in != "_in") {
+        throw std::runtime_error((std::string)"expected _in, but found " + _in);
+    }
+    
+    PTR(Expr) body = parse_expr(in);
+    
+    return NEW(LetExpr)(varName, rhs, body);
+}
+
+static PTR(Expr) parse_if(std::istream &in) {
+    PTR(Expr) if_part = parse_expr(in);
+    
+    std::string _then = parse_keyword(in);
+    if (_then != "_then") {
+        throw std::runtime_error((std::string)"expected _then, but found " + _then);
+    }
+    
+    PTR(Expr) then_part = parse_expr(in);
+    
+    std::string _else = parse_keyword(in);
+    if (_else != "_else") {
+        throw std::runtime_error((std::string)"expected _else, but found" + _else);
+    }
+    
+    PTR(Expr) else_part = parse_expr(in);
+    
+    return NEW(IfExpr)(if_part, then_part, else_part);
+}
+
+static PTR(Expr) parse_fun(std::istream &in) {
+    char c = peek_after_spaces(in);
+    
+    if (c != '(')
+        throw std::runtime_error((std::string)"expected ( after _fun, but found" + c);
+    
+    in.get();
+    peek_after_spaces(in);
+    
+    std::string formal_arg = parse_alphabetic(in, "");
+    if (formal_arg == "")
+        throw std::runtime_error((std::string)"formal_arg name error");
+    
+    c = peek_after_spaces(in);
+    
+    if (c != ')')
+        throw std::runtime_error((std::string)"expected ) after formal_arg, but found" + c);
+    
+    in.get();
+    PTR(Expr) body = parse_expr(in);
+    
+    return NEW(FunExpr)(formal_arg, body);
 }
 
 
-TEST_CASE("interpreter"){
-    CHECK(parse_str("_let x = (_let y = 7 _in y) _in x")->interp(Env::emptyenv)->equals(NEW(NumVal)(7)));
-    CHECK(parse_str("_let x = 5 _in _let y = x _in y + y")->interp(Env::emptyenv)->equals(NEW(NumVal)(10)));
-    CHECK(parse_str("_let x = 6 _in _let x = 19 _in x")->interp(Env::emptyenv)->equals(NEW(NumVal)(19)));
-    CHECK(parse_str("_if 5 == 3 _then 2 _else 89")->interp(Env::emptyenv)->equals(NEW(NumVal)(89)));
-    CHECK(parse_str("-8 + 3")->interp(Env::emptyenv)->equals(NEW(NumVal)(-5)));
+TEST_CASE( "Simple expressions" ) {
+    // Single number
+    CHECK ( parse_str_error(" ( 1 ") == "expected a close parenthesis" );
+    CHECK ( parse_str_error(" 1 )") == "expected end of file at )" );
+
+    CHECK( parse_str(" 10 ")->equals(NEW(NumExpr)(10)) );
+    CHECK( parse_str("10")->equals(NEW(NumExpr)(10)) );
+    CHECK( parse_str("(10)")->equals(NEW(NumExpr)(10)) );
+
+    // Adding two numbers
+    PTR(Expr) ten_plus_one = NEW(AddExpr)(NEW(NumExpr)(10), NEW(NumExpr)(1));
+
+    CHECK( parse_str("10+1")->equals(ten_plus_one) );
+    CHECK( parse_str("(10+1)")->equals(ten_plus_one) );
+    CHECK( parse_str("(10)+1")->equals(ten_plus_one) );
+    CHECK( parse_str("10+(1)")->equals(ten_plus_one) );
+    CHECK( parse_str(" 10 ")->equals(NEW(NumExpr)(10)) );
+    CHECK( parse_str(" (  10 ) ")->equals(NEW(NumExpr)(10)) );
+    CHECK( parse_str(" 10  + 1")->equals(ten_plus_one) );
+    CHECK( parse_str(" ( 10 + 1 ) ")->equals(ten_plus_one) );
+
+    // Mix of add and multiply
+    CHECK( parse_str("1+2*3")->equals(NEW(AddExpr)(NEW(NumExpr)(1),
+                                                   NEW(MultExpr)(NEW(NumExpr)(2), NEW(NumExpr)(3)))) );
+    CHECK( parse_str("1*2+3")->equals(NEW(AddExpr)(NEW(MultExpr)(NEW(NumExpr)(1), NEW(NumExpr)(2)),
+                                                   NEW(NumExpr)(3))) );
+    CHECK( parse_str("4*2*3")->equals(NEW(MultExpr)(NEW(NumExpr)(4),
+                                                    NEW(MultExpr)(NEW(NumExpr)(2), NEW(NumExpr)(3)))) );
+    CHECK( parse_str("4+2+3")->equals(NEW(AddExpr)(NEW(NumExpr)(4),
+                                                   NEW(AddExpr)(NEW(NumExpr)(2), NEW(NumExpr)(3)))) );
+    CHECK( parse_str("4*(2+3)")->equals(NEW(MultExpr)(NEW(NumExpr)(4),
+                                                      NEW(AddExpr)(NEW(NumExpr)(2), NEW(NumExpr)(3)))) );
+    CHECK( parse_str("(2+3)*4")->equals(NEW(MultExpr)(NEW(AddExpr)(NEW(NumExpr)(2), NEW(NumExpr)(3)),
+                                                      NEW(NumExpr)(4))) );
+    CHECK( parse_str(" 11 * ( 10 + 1 ) ")->equals(NEW(MultExpr)(NEW(NumExpr)(11),
+                                                                ten_plus_one)) );
+    CHECK( parse_str(" ( 11 * 10 ) + 1 ")
+          ->equals(NEW(AddExpr)(NEW(MultExpr)(NEW(NumExpr)(11), NEW(NumExpr)(10)),
+                                NEW(NumExpr) (1))) );
+    CHECK( parse_str(" 1 + 2 * 3 ")
+          ->equals(NEW(AddExpr)(NEW(NumExpr)(1),
+                                NEW(MultExpr)(NEW(NumExpr)(2), NEW(NumExpr)(3)))) );
+
+    // Variable expressions
+    CHECK( parse_str("xyz")->equals(NEW(VarExpr)("xyz")) );
+    CHECK( parse_str("xyz+1")->equals(NEW(AddExpr)(NEW(VarExpr)("xyz"), NEW(NumExpr)(1))) );
+
+    //Bool expressions
+    CHECK( parse_str("_true")->equals(NEW(BoolExpr)(true)) );
+    CHECK( parse_str("_false")->equals(NEW(BoolExpr)(false)) );
+
+    // Invalid keywords
+    CHECK( parse_str_error("_maybe ") == "unexpected keyword _maybe" );
+
+    // Invalid chars
+    CHECK ( parse_str_error("!") == "expected a digit or open parenthesis at !" );
 }
 
-TEST_CASE("function"){
-    CHECK(parse_str("_fun (x) x + 1")->equals(NEW(FuncExpr)("x", NEW(AddExpr)( NEW(VarExpr)("x"), NEW(NumExpr)(1)))));
-    CHECK(parse_str("_let f = _fun (x) x + 1 _in f(10)")->interp(Env::emptyenv)->equals(NEW(NumVal)(11)));
-    CHECK(parse_str("_let y = 8 _in _let f = _fun (x) x * y _in f(2)")->interp(Env::emptyenv)->equals(NEW(NumVal)(16)));
-    CHECK(parse_str("(_fun (x) x + 2)(1)")->interp(Env::emptyenv)->equals(NEW(NumVal)(3)));
-    CHECK(parse_str("_let f = _fun (x) _fun (y) x*x + y*y _in (f(2))(3)")->interp(Env::emptyenv)->equals(NEW(NumVal)(13)));
-    CHECK(parse_str("_let f = _fun (x) _fun (y) x*x + y*y _in f(2)(3)")->interp(Env::emptyenv)->equals(NEW(NumVal)(13)));
-    CHECK(parse_str("_let add = _fun (x) _fun (y) x + y _in _let addFive = add(5) _in addFive(10)")->interp(Env::emptyenv)->equals(NEW(NumVal)(15)));
+TEST_CASE( "Let Expression" ) {
+    // Optimized into a single value
+    CHECK(parse_str("_let y = 6 _in y + 5")->optimize()
+          ->equals(parse_str("11")));
+    CHECK(parse_str("_let x = 4 _in _let y = 9 _in x + y")->optimize()
+          ->equals(parse_str("13")));
+
+    // Have variables on the RHS of =
+    CHECK(parse_str("_let x = z _in x + 3")->optimize()
+          ->equals(parse_str("_let x = z _in x + 3")));
+    CHECK(parse_str("_let x = 4 _in _let y = z _in x + y")->optimize()
+          ->equals(parse_str("_let y = z _in 4 + y")));
+    CHECK(parse_str("_let x = 5 _in _let y = z + 2 _in x + y + (2 * 3)")->optimize()
+          ->equals(parse_str("_let y = z + 2 _in 5 + y + 6")));
+
+    // Let expression on the RHS of a equal sign
+    CHECK(parse_str("_let x = _let y = 6 _in y + 5 _in x + 10")->optimize()
+          ->equals(parse_str("21")));
 }
 
-TEST_CASE("recursive functions"){
+TEST_CASE( "If Expression" ) {
+    // Optimized into a boolean or number
+    CHECK(parse_str("_if _false _then _true _else _false" )->optimize()->equals(NEW(BoolExpr)(false)));
+    CHECK(parse_str("_if 3 + 3 == 6 _then _true _else _false" )->optimize()->equals(NEW(BoolExpr)(true)));
+    CHECK(parse_str("_if -3 + -3 == -6 _then _true _else _false" )->optimize()->equals(NEW(BoolExpr)(true)));
+    CHECK(parse_str("_if 7 == 3 + 4 _then 2 _else 4")->optimize()->equals(NEW(NumExpr)(2)));
+
+    // Nested let in if expression
+    CHECK(parse_str("_if (_let x = _true _in x) _then -3 _else -4")
+          ->optimize()->equals(NEW(NumExpr)(-3)));
+
+    // Nested if in let expression
+    CHECK(parse_str("_let x = (_if _false _then _true _else _false) _in x")
+          ->optimize()->equals(NEW(BoolExpr)(false)));
+}
+
+TEST_CASE( "FunExpr & CallFunExpr " ) {
+    
+    CHECK( parse_str("_let f = _fun(x) x + x"
+                     "_in f(2)")
+          ->interp(Env::emptyenv)->equals(NEW(NumVal)(4)) );
+    CHECK( Step::interp_by_steps(parse_str("_let f = _fun(x) x + x"
+                                           "_in f(2)"))
+          ->equals(NEW(NumVal)(4)) );
+
+//    std::cout << "hey" << Step::interp_by_steps(parse_str("_let f = _fun(x) x + x"
+//                                                          "_in f(2)"))->to_string() << std::endl;
+
+    CHECK( parse_str("_let f = _fun(x)"
+                     "_fun(y)"
+                     "x * x + y * y"
+                     "_in f(2)(3)")
+          ->interp(Env::emptyenv)->equals(NEW(NumVal)(13)) );
+    CHECK( Step::interp_by_steps(parse_str("_let f = _fun(x)"
+                                           "_fun(y)"
+                                           "x * x + y * y"
+                                           "_in f(2)(3)"))
+          ->equals(NEW(NumVal)(13)) );
+
+    CHECK( parse_str("(_fun(x) _fun(y) x * x + y * y)(2)")
+          ->interp(Env::emptyenv)->to_string() == "[FUNCTION]" );
+    CHECK( Step::interp_by_steps(parse_str("(_fun(x) _fun(y) x * x + y * y)(2)"))
+          ->to_string() == "[FUNCTION]" );
+
+    CHECK( parse_str("((_fun(x) _fun(y) x * x + y * y)(2))(3)")
+          ->interp(Env::emptyenv)->to_string() == "13" );
+    CHECK( Step::interp_by_steps(parse_str("((_fun(x) _fun(y) x * x + y * y)(2))(3)"))
+          ->to_string() == "13" );
+
+    CHECK( parse_str("_let add = _fun(x)"
+                     "             _fun(y)"
+                     "               x + y"
+                     "_in _let addFive = add(5)"
+                     "_in addFive(10)")
+          ->interp(Env::emptyenv)->to_string() == "15" );
+    CHECK( Step::interp_by_steps(parse_str("_let add = _fun(x)"
+                                           "             _fun(y)"
+                                           "               x + y"
+                                           "_in _let addFive = add(5)"
+                                           "_in addFive(10)"))
+          ->to_string() == "15" );
+
     CHECK( parse_str("_let factrl = _fun(factrl)"
                      "                _fun(x)"
                      "                  _if x == 1"
@@ -301,6 +443,14 @@ TEST_CASE("recursive functions"){
                      "                  _else x * factrl(factrl)(x + -1)"
                      "_in factrl(factrl)(5)")
           ->interp(Env::emptyenv)->to_string() == "120" );
+    CHECK( Step::interp_by_steps(parse_str("_let factrl = _fun(factrl)"
+                                           "                _fun(x)"
+                                           "                  _if x == 1"
+                                           "                  _then 1"
+                                           "                  _else x * factrl(factrl)(x + -1)"
+                                           "_in factrl(factrl)(5)"))
+          ->to_string() == "120" );
+
     CHECK( parse_str("_let fib = _fun (fib)"
                      "              _fun (x)"
                      "                 _if x == 0"
@@ -310,17 +460,7 @@ TEST_CASE("recursive functions"){
                      "                 _else fib(fib)(x + -1)"
                      "                       + fib(fib)(x + -2)"
                      "_in fib(fib)(10)")->interp(Env::emptyenv)->to_string() == "89");
-}
-
-TEST_CASE("continuation"){
-    CHECK( Step::interp_by_steps(parse_str("_let factrl = _fun(factrl)"
-                                           "                _fun(x)"
-                                           "                  _if x == 1"
-                                           "                  _then 1"
-                                           "                  _else x * factrl(factrl)(x + -1)"
-                                           "_in factrl(factrl)(5)"))
-          ->to_string() == "120" );
-    CHECK( (Step::interp_by_steps)(parse_str("_let fib = _fun (fib)"
+    CHECK( Step::interp_by_steps(parse_str("_let fib = _fun (fib)"
                                            "              _fun (x)"
                                            "                 _if x == 0"
                                            "                 _then 1"
@@ -329,6 +469,29 @@ TEST_CASE("continuation"){
                                            "                 _else fib(fib)(x + -1)"
                                            "                       + fib(fib)(x + -2)"
                                            "_in fib(fib)(10)"))->to_string() == "89");
-    
-    CHECK( Step::interp_by_steps(parse_str("_let countdown = _fun(countdown) _fun(n) _if n == 0 _then 0 _else countdown(countdown)(n + -1) _in countdown(countdown)(1000000)")));
+
+    CHECK(parse_str("_let countdown = _fun(countdown)"
+                    "  _fun(n)"
+                    "    _if n == 0"
+                    "    _then 0"
+                    "    _else countdown(countdown)(n + -1)"
+                    "_in countdown(countdown)(100)")
+          ->interp(Env::emptyenv)
+          ->to_string() == "0");
+
+    CHECK(Step::interp_by_steps(parse_str("_let countdown = _fun(countdown)"
+                                          "  _fun(n)"
+                                          "    _if n == 0"
+                                          "    _then 0"
+                                          "    _else countdown(countdown)(n + -1)"
+                                          "_in countdown(countdown)(10000)") )
+          ->to_string() == "0");
+
+    CHECK(Step::interp_by_steps(parse_str("_let count = _fun(count)"
+                                          "  _fun(n)"
+                                          "    _if n == 0"
+                                          "    _then 0"
+                                          "    _else 1 + count(count)(n + -1)"
+                                          "_in count(count)(1000000)") )
+          ->to_string() == "100000");
 }

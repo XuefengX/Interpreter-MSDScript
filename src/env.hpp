@@ -10,32 +10,45 @@
 #define env_hpp
 
 #include "pointer.hpp"
+#include "gcable.hpp"
 #include <string>
 
 class Val;
 
-class Env ENABLE_THIS(Env){
+class Env : public GCable {
 public:
+    
     static PTR(Env) emptyenv;
-    virtual PTR(Val) lookup(std::string file_name) = 0;
+    
+    virtual PTR(Val) lookup(std::string find_name) = 0;
+    
     virtual bool equals(PTR(Env) env) = 0;
 };
 
-class EmptyEnv : public Env{
+class EmptyEnv : public Env {
 public:
-    PTR(Val) lookup(std::string file_name);
+    PTR(Val) lookup(std::string find_name);
     bool equals(PTR(Env) env);
+    
+    int size();
+    
+    void trace();
 };
 
-class ExtendedEnv : public Env{
+class ExtendedEnv : public Env {
 public:
     std::string name;
     PTR(Val) val;
     PTR(Env) rest;
     
-    ExtendedEnv(std::string name, PTR(Val) val, PTR(Env) rest);
-    PTR(Val) lookup(std::string file_name);
+    ExtendedEnv(std::string name, PTR(Val) val, PTR(Env) env);
+    PTR(Val) lookup(std::string find_name);
     bool equals(PTR(Env) env);
+    
+    int size();
+    
+    void trace();
 };
 
-#endif /* env_hpp */
+
+#endif /* Env_h */

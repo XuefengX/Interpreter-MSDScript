@@ -9,15 +9,16 @@
 #ifndef pointer_hpp
 #define pointer_hpp
 
-#define ENABLE_SMART_POINTER 0
+#define ENABLE_SMART_POINTER 1
 
 #if ENABLE_SMART_POINTER
 
 #define NEW(T) new T
-#define PTR(T) T*
-#define CAST(T) dynamic_cast<T*>
+#define PTR(T) T *
+#define CAST(T) dynamic_cast<T *>
 #define THIS this
 #define ENABLE_THIS(T) /* empty */
+#define UPDATE(id) GCable::update((GCable **)&(id))
 
 #else
 
