@@ -1,4 +1,6 @@
 # MSDScript
+*This is the stable version with Cpp reference count*   
+*Test version using garbage collector resides in main branch*
 
 by _**Xuefeng Xu**_   
 Version: _1.0.1_
